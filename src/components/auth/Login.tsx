@@ -22,10 +22,9 @@ const Login: React.FC = () => {
 
     try {
       const result = await login(formData.email, formData.password, formData.role, formData.rememberMe);
-      // Only navigate if we have a valid role
+      
       if (result?.role) {
-        // For analysts, navigate to the main dashboard
-        navigate(result.role === 'analyst' ? '/analyst' : '/investor/dashboard');
+        navigate(result.role === 'analyst' ? '/analyst' : '/investor/dashboard', { replace: true });
       } else {
         setError('Login failed - invalid role. Please try again.');
       }
