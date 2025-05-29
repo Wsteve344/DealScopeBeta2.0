@@ -43,6 +43,40 @@ export const api = {
     }
   },
 
+  users: {
+    delete: async (email: string) => {
+      // First get the user ID from the email
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (userError) throw userError;
+      if (!userData) throw new Error('User not found');
+
+      // Call the Edge Function to delete the user
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          },
+          body: JSON.stringify({ userId: userData.id })
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete user');
+      }
+
+      return { success: true };
+    }
+  },
+
   deals: {
     get: async (id: string) => {
       const { data: { user } } = await supabase.auth.getUser();
