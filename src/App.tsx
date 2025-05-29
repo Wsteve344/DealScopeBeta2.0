@@ -40,6 +40,7 @@ function App() {
         <AnalyticsProvider>
           <Toaster position="top-right" />
           <Routes>
+            {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/free-guide" element={<LeadMagnet />} />
             <Route path="/login" element={<Login />} />
