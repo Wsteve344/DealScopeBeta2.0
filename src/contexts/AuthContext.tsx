@@ -24,11 +24,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const initializeAuth = async () => {
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
-
         if (session?.user) {
           // Get user profile from database
           const { data: profile, error: profileError } = await supabase
@@ -50,34 +48,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUserRole(null);
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
+        console.error('Auth state change error:', error);
         setIsAuthenticated(false);
         setUser(null);
         setUserRole(null);
       } finally {
         setIsLoadingAuth(false);
       }
-    };
+    });
 
-    initializeAuth();
-
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
-
-        setIsAuthenticated(true);
-        setUser(session.user);
-        setUserRole(profile?.role || null);
-      } else {
-        setIsAuthenticated(false);
-        setUser(null);
-        setUserRole(null);
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (!error && session) {
+        // Session exists, let onAuthStateChange handle it
+        return;
       }
+      // No session, we can stop loading
       setIsLoadingAuth(false);
     });
 
@@ -110,14 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-      if (signUpError) {
-        if (signUpError.message === 'User already registered' || 
-            signUpError.message.includes('user_already_exists')) {
-          throw new Error('This email is already registered. Please log in or use a different email.');
-        }
-        throw signUpError;
-      }
-
+      if (signUpError) throw signUpError;
       if (!authData.user) throw new Error('Failed to create user account');
 
       // Create user profile in the database
@@ -175,9 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('Failed to log analytics event:', analyticsError);
       }
 
-      // Now log the user in
-      await login(email, password, role, false);
-
+      toast.success('Account created successfully');
     } catch (error: any) {
       console.error('Signup error:', error);
       throw error;
@@ -186,13 +163,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string, role: string, rememberMe: boolean): Promise<{ role: string | null }> => {
     try {
-      // Set session persistence based on rememberMe
-      await supabase.auth.setSession({
-        access_token: '',
-        refresh_token: ''
-      });
-
-      // First authenticate the user
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -207,113 +177,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Get user profile from database
       const { data: profile, error: profileError } = await supabase
         .from('users')
-        .select('*')
+        .select('role')
         .eq('id', authData.user.id)
-        .maybeSingle();
+        .single();
 
-      // If profile doesn't exist, create it using the role from auth metadata
-      if (!profile) {
-        const userRole = role || authData.user.user_metadata?.role || 'investor';
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert([{
-            id: authData.user.id,
-            email: authData.user.email,
-            role: userRole,
-            created_at: new Date().toISOString()
-          }]);
+      if (profileError) throw profileError;
 
-        if (insertError) {
-          throw new Error('Failed to create user profile. Please contact support.');
-        }
-
-        // Create credit wallet with 3 complementary credits for new users
-        const { error: walletError } = await supabase
-          .from('credit_wallets')
-          .insert([{
-            user_id: authData.user.id,
-            credits: 3,
-            tier: 'basic',
-            rollover_credits: 0
-          }]);
-
-        if (walletError) {
-          throw new Error('Failed to initialize credit wallet. Please contact support.');
-        }
-
-        // Record the complementary credit transaction
-        const { error: transactionError } = await supabase
-          .from('credit_transactions')
-          .insert([{
-            user_id: authData.user.id,
-            amount: 3,
-            type: 'purchase',
-            status: 'completed',
-            created_at: new Date().toISOString()
-          }]);
-
-        if (transactionError) {
-          console.error('Failed to record credit transaction:', transactionError);
-        }
-
-        // Log login event
-        const { error: analyticsError } = await supabase
-          .from('analytics_events')
-          .insert([{
-            user_id: authData.user.id,
-            event_type: 'auth',
-            event_name: 'login',
-            metadata: {
-              role: userRole,
-              login_method: 'email'
-            }
-          }]);
-
-        if (analyticsError) {
-          console.error('Failed to log analytics event:', analyticsError);
-        }
-
-        // Fetch the newly created profile
-        const { data: newProfile, error: newProfileError } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', authData.user.id)
-          .single();
-
-        if (newProfileError) {
-          throw new Error('Failed to verify user profile. Please try again.');
-        }
-
-        // Verify role matches
-        if (newProfile.role !== role) {
-          throw new Error(`Please select ${newProfile.role} when logging in.`);
-        }
-
-        setIsAuthenticated(true);
-        setUserRole(newProfile.role);
-        setUser(authData.user);
-
-        toast.success('Successfully logged in');
-        return { role: newProfile.role };
-
-      } else {
-        // Verify role matches for existing profile
-        if (profile.role !== role) {
-          throw new Error(`Please select ${profile.role} when logging in.`);
-        }
-
-        setIsAuthenticated(true);
-        setUserRole(profile.role);
-        setUser(authData.user);
-
-        toast.success('Successfully logged in');
-        return { role: profile.role };
+      // Verify role matches
+      if (profile.role !== role) {
+        throw new Error(`Please select ${profile.role} when logging in.`);
       }
 
+      toast.success('Successfully logged in');
+      return { role: profile.role };
     } catch (error: any) {
-      setIsAuthenticated(false);
-      setUser(null);
-      setUserRole(null);
+      console.error('Login error:', error);
       throw error;
     }
   };
@@ -321,12 +199,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await supabase.auth.signOut();
-      setIsAuthenticated(false);
-      setUser(null);
-      setUserRole(null);
       navigate('/login');
       toast.success('Successfully logged out');
     } catch (error) {
+      console.error('Logout error:', error);
       toast.error('Failed to logout');
     }
   };
