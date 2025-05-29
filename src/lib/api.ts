@@ -15,7 +15,8 @@ export const api = {
         .from('credit_wallets')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
       if (walletError && walletError.code !== 'PGRST116') {
         throw walletError;
