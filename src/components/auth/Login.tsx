@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Building2, LogIn, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const location = useLocation();
+  const { login, isAuthenticated, userRole, isLoadingAuth } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -15,6 +16,15 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Handle navigation after successful authentication
+  useEffect(() => {
+    if (isAuthenticated && !isLoadingAuth && userRole) {
+      const from = location.state?.from?.pathname;
+      const redirectPath = from || (userRole === 'analyst' ? '/analyst' : '/investor/dashboard');
+      navigate(redirectPath, { replace: true });
+    }
+  }, [isAuthenticated, isLoadingAuth, userRole, navigate, location]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Login submission started');
@@ -23,17 +33,8 @@ const Login: React.FC = () => {
 
     try {
       console.log('Attempting login with role:', formData.role);
-      const result = await login(formData.email, formData.password, formData.role, formData.rememberMe);
-      console.log('Login result:', result);
-
-      if (result?.role) {
-        const redirectPath = result.role === 'analyst' ? '/analyst' : '/investor/dashboard';
-        console.log('Login successful, redirecting to:', redirectPath);
-        navigate(redirectPath, { replace: true });
-      } else {
-        console.error('No role returned from login');
-        setError('Login failed - invalid role. Please try again.');
-      }
+      await login(formData.email, formData.password, formData.role, formData.rememberMe);
+      // Navigation will be handled by the useEffect hook
     } catch (error: any) {
       console.error('Login error:', error);
       let errorMessage = 'An unexpected error occurred. Please try again.';
@@ -52,6 +53,17 @@ const Login: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
