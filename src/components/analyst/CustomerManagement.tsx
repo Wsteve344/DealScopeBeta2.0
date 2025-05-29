@@ -17,14 +17,6 @@ interface Customer {
   phone_number?: string;
 }
 
-interface CreditAdjustment {
-  id: string;
-  amount: number;
-  type: 'purchase' | 'debit' | 'refund';
-  notes?: string;
-  created_at: string;
-}
-
 const CustomerManagement: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -39,7 +31,7 @@ const CustomerManagement: React.FC = () => {
   const [creditAmount, setCreditAmount] = useState('');
   const [creditNotes, setCreditNotes] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
-  const [creditHistory, setCreditHistory] = useState<CreditAdjustment[]>([]);
+  const [creditHistory, setCreditHistory] = useState<any[]>([]);
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
@@ -48,15 +40,16 @@ const CustomerManagement: React.FC = () => {
 
   const loadCustomers = async () => {
     try {
-      // First get all users
+      // Get all users except analysts
       const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('*')
+        .select('*, credit_wallets(credits)')
+        .eq('role', 'investor')
         .order('created_at', { ascending: false });
 
       if (usersError) throw usersError;
 
-      // Then get subscription statuses
+      // Get subscription statuses
       const { data: subscriptionsData, error: subscriptionsError } = await supabase
         .from('stripe_subscriptions')
         .select('user_id, status');
@@ -71,8 +64,12 @@ const CustomerManagement: React.FC = () => {
 
       // Combine the data
       const formattedCustomers = usersData?.map(user => ({
-        ...user,
-        subscription_status: subscriptionMap?.[user.id] || null
+        id: user.id,
+        email: user.email,
+        created_at: user.created_at,
+        subscription_status: subscriptionMap?.[user.id] || null,
+        credits: user.credit_wallets?.[0]?.credits || 0,
+        phone_number: user.phone_number
       }));
 
       setCustomers(formattedCustomers || []);
