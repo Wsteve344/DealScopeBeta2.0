@@ -17,18 +17,28 @@ const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Login submission started');
     setIsLoading(true);
     setError(null);
 
     try {
+      console.log('Calling login function with:', { 
+        email: formData.email, 
+        role: formData.role, 
+        rememberMe: formData.rememberMe 
+      });
+      
       const result = await login(formData.email, formData.password, formData.role, formData.rememberMe);
+      console.log('Login result:', result);
       
       if (result?.role) {
+        console.log('Navigating to dashboard for role:', result.role);
         navigate(result.role === 'analyst' ? '/analyst' : '/investor/dashboard', { replace: true });
       } else {
         setError('Login failed - invalid role. Please try again.');
       }
     } catch (error: any) {
+      console.error('Login error:', error);
       let errorMessage = 'An unexpected error occurred. Please try again.';
       
       if (error.message?.includes('Invalid login credentials')) {
@@ -38,8 +48,8 @@ const Login: React.FC = () => {
       }
       
       setError(errorMessage);
-      console.error('Login error:', error.message);
     } finally {
+      console.log('Login submission completed');
       setIsLoading(false);
     }
   };
