@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { User, Settings, Bell, Shield, CreditCard, Plus, LogOut, ArrowLeft } from 'lucide-react';
+import { User, Settings, Bell, Shield, CreditCard, Plus, LogOut, ArrowLeft, Pencil, X, Check } from 'lucide-react';
 import { api } from '../../lib/api';
 import toast from 'react-hot-toast';
 
@@ -21,6 +21,7 @@ const UserProfile: React.FC = () => {
   const { user, updateProfile, isAuthenticated, logout, userRole } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [credits, setCredits] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<Profile>({
     name: user?.user_metadata?.name || '',
     email: user?.email || '',
@@ -31,6 +32,7 @@ const UserProfile: React.FC = () => {
       reports: true
     }
   });
+  const [editedProfile, setEditedProfile] = useState<Profile>(profile);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -42,14 +44,12 @@ const UserProfile: React.FC = () => {
   useEffect(() => {
     const loadCredits = async () => {
       try {
-        // Only attempt to load credits if user is authenticated
         if (isAuthenticated) {
           const wallet = await api.credits.get();
           setCredits(wallet.credits);
         }
       } catch (error) {
         console.error('Error loading credits:', error);
-        // Only show error toast if we're authenticated (otherwise it's expected)
         if (isAuthenticated) {
           toast.error('Failed to load credits');
         }
@@ -61,11 +61,13 @@ const UserProfile: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      setProfile(prev => ({
-        ...prev,
+      const newProfile = {
+        ...profile,
         name: user.user_metadata?.name || '',
         email: user.email || ''
-      }));
+      };
+      setProfile(newProfile);
+      setEditedProfile(newProfile);
     }
   }, [user]);
 
@@ -75,9 +77,11 @@ const UserProfile: React.FC = () => {
 
     try {
       await updateProfile({
-        name: profile.name,
-        email: profile.email
+        name: editedProfile.name,
+        email: editedProfile.email
       });
+      setProfile(editedProfile);
+      setIsEditing(false);
       toast.success('Profile updated successfully');
     } catch (error) {
       toast.error('Failed to update profile');
@@ -103,6 +107,11 @@ const UserProfile: React.FC = () => {
     } catch (error) {
       toast.error('Failed to sign out');
     }
+  };
+
+  const cancelEdit = () => {
+    setEditedProfile(profile);
+    setIsEditing(false);
   };
 
   // Return null while checking authentication or if not authenticated
@@ -163,51 +172,72 @@ const UserProfile: React.FC = () => {
         {/* Personal Information */}
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <User className="h-5 w-5 text-gray-500" />
-              Personal Information
-            </h2>
+              <h2 className="text-xl font-semibold text-gray-900">Personal Information</h2>
+            </div>
+            {!isEditing ? (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
+              >
+                <Pencil className="h-5 w-5" />
+                Edit
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={cancelEdit}
+                  className="flex items-center gap-1 text-gray-600 hover:text-gray-700"
+                >
+                  <X className="h-5 w-5" />
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isLoading}
+                  className="flex items-center gap-1 text-green-600 hover:text-green-700 ml-4"
+                >
+                  <Check className="h-5 w-5" />
+                  Save
+                </button>
+              </div>
+            )}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Full Name
               </label>
-              <input
-                type="text"
-                id="name"
-                value={profile.name}
-                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={editedProfile.name}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, name: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              ) : (
+                <p className="px-4 py-2 bg-gray-50 rounded-md text-gray-900">{profile.name || 'Not set'}</p>
+              )}
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Email Address
               </label>
-              <input
-                type="email"
-                id="email"
-                value={profile.email}
-                onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
+              {isEditing ? (
+                <input
+                  type="email"
+                  value={editedProfile.email}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, email: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              ) : (
+                <p className="px-4 py-2 bg-gray-50 rounded-md text-gray-900">{profile.email}</p>
+              )}
             </div>
-
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={isLoading}
-                className={`bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                  isLoading ? 'opacity-75 cursor-not-allowed' : ''
-                }`}
-              >
-                {isLoading ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
 
         {/* Notification Preferences */}
