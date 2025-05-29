@@ -30,7 +30,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, requiredRole }) =
 
   if (requiredRole && userRole !== requiredRole) {
     toast.error('You do not have permission to access this page');
-    return <Navigate to="/" replace />;
+    return <Navigate to="/\" replace />;
   }
 
   return <>{children}</>;
