@@ -168,9 +168,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string, role: string, rememberMe: boolean): Promise<{ role: string | null }> => {
     console.log('Login attempt started:', { email, role, rememberMe });
     try {
-      // Clear any existing session first
-      await supabase.auth.signOut();
-      
       console.log('Calling Supabase auth.signInWithPassword');
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
@@ -208,18 +205,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(`Please select ${profile.role} when logging in.`);
       }
 
-      setIsAuthenticated(true);
-      setUser(authData.user);
-      setUserRole(profile.role);
-
+      // Let onAuthStateChange handle the state updates
       console.log('Login successful, returning role');
-      toast.success('Successfully logged in');
       return { role: profile.role };
     } catch (error: any) {
       console.error('Login process error:', error);
-      setIsAuthenticated(false);
-      setUser(null);
-      setUserRole(null);
       throw error;
     }
   };
@@ -227,9 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await supabase.auth.signOut();
-      setIsAuthenticated(false);
-      setUser(null);
-      setUserRole(null);
+      // Let onAuthStateChange handle the state updates
       navigate('/login');
       toast.success('Successfully logged out');
     } catch (error) {
