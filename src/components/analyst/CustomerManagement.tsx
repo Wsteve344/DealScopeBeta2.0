@@ -40,14 +40,27 @@ const CustomerManagement: React.FC = () => {
 
   const loadCustomers = async () => {
     try {
-      // Get all users except analysts
+      // First get all users except analysts
       const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('*, credit_wallets(credits)')
+        .select('*')
         .eq('role', 'investor')
         .order('created_at', { ascending: false });
 
       if (usersError) throw usersError;
+
+      // Then get credit wallet data separately
+      const { data: walletsData, error: walletsError } = await supabase
+        .from('credit_wallets')
+        .select('*');
+
+      if (walletsError) throw walletsError;
+
+      // Create a map of user_id to credits
+      const creditsMap = walletsData?.reduce((acc, wallet) => {
+        acc[wallet.user_id] = wallet.credits;
+        return acc;
+      }, {} as Record<string, number>);
 
       // Get subscription statuses
       const { data: subscriptionsData, error: subscriptionsError } = await supabase
@@ -68,7 +81,7 @@ const CustomerManagement: React.FC = () => {
         email: user.email,
         created_at: user.created_at,
         subscription_status: subscriptionMap?.[user.id] || null,
-        credits: user.credit_wallets?.[0]?.credits || 0,
+        credits: creditsMap?.[user.id] || 0,
         phone_number: user.phone_number
       }));
 
