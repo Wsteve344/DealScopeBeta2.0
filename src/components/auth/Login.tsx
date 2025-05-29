@@ -22,19 +22,16 @@ const Login: React.FC = () => {
     setError(null);
 
     try {
-      console.log('Calling login function with:', { 
-        email: formData.email, 
-        role: formData.role, 
-        rememberMe: formData.rememberMe 
-      });
-      
+      console.log('Attempting login with role:', formData.role);
       const result = await login(formData.email, formData.password, formData.role, formData.rememberMe);
       console.log('Login result:', result);
-      
+
       if (result?.role) {
-        console.log('Navigating to dashboard for role:', result.role);
-        navigate(result.role === 'analyst' ? '/analyst' : '/investor/dashboard', { replace: true });
+        const redirectPath = result.role === 'analyst' ? '/analyst' : '/investor/dashboard';
+        console.log('Login successful, redirecting to:', redirectPath);
+        navigate(redirectPath, { replace: true });
       } else {
+        console.error('No role returned from login');
         setError('Login failed - invalid role. Please try again.');
       }
     } catch (error: any) {
@@ -45,6 +42,8 @@ const Login: React.FC = () => {
         errorMessage = 'Invalid email or password. Please check your credentials and try again.';
       } else if (error.message?.includes('Failed to fetch user profile')) {
         errorMessage = 'Unable to verify user credentials. Please try again.';
+      } else if (error.message?.includes('Please select')) {
+        errorMessage = error.message;
       }
       
       setError(errorMessage);
