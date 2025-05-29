@@ -19,12 +19,12 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, requiredRole }) =
 
   if (!isAuthenticated) {
     toast.error('Please log in to continue');
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/login\" state={{ from: location }} replace />;
   }
 
   if (requiredRole && userRole !== requiredRole) {
     toast.error('You do not have permission to access this page');
-    return <Navigate to="/" replace />;
+    return <Navigate to="/\" replace />;
   }
 
   return <>{children}</>;
