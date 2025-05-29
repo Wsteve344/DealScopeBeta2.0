@@ -193,27 +193,30 @@ const CustomerManagement: React.FC = () => {
     if (!selectedCustomer || deleteConfirmation !== selectedCustomer.email) return;
 
     try {
-      // Delete user data
-      const { error: deleteError } = await supabase.auth.admin.deleteUser(
-        selectedCustomer.id
+      // Call the Edge Function to delete the user and associated data
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userId: selectedCustomer.id })
+        }
       );
 
-      if (deleteError) throw deleteError;
-
-      // Clean up associated data
-      await Promise.all([
-        supabase.from('credit_wallets').delete().eq('user_id', selectedCustomer.id),
-        supabase.from('credit_transactions').delete().eq('user_id', selectedCustomer.id),
-        supabase.from('users').delete().eq('id', selectedCustomer.id)
-      ]);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete user via Edge Function');
+      }
 
       toast.success('Account deleted successfully');
       setShowDeleteModal(false);
       setDeleteConfirmation('');
-      loadCustomers();
+      loadCustomers(); // Reload customers to reflect changes
     } catch (error) {
       console.error('Error deleting account:', error);
-      toast.error('Failed to delete account');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete account');
     }
   };
 
