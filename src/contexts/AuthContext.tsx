@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
@@ -7,6 +7,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   userRole: string | null;
   user: any;
+  isLoadingAuth: boolean;
   signUp: (email: string, password: string, role: string, phoneNumber: string) => Promise<void>;
   login: (email: string, password: string, role: string, rememberMe: boolean) => Promise<{ role: string | null }>;
   logout: () => void;
@@ -19,7 +20,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [user, setUser] = useState(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+
+        if (session?.user) {
+          // Get user profile from database
+          const { data: profile, error: profileError } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profileError && profileError.code !== 'PGRST116') {
+            throw profileError;
+          }
+
+          setIsAuthenticated(true);
+          setUser(session.user);
+          setUserRole(profile?.role || null);
+        } else {
+          setIsAuthenticated(false);
+          setUser(null);
+          setUserRole(null);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        setIsAuthenticated(false);
+        setUser(null);
+        setUserRole(null);
+      } finally {
+        setIsLoadingAuth(false);
+      }
+    };
+
+    initializeAuth();
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+
+        setIsAuthenticated(true);
+        setUser(session.user);
+        setUserRole(profile?.role || null);
+      } else {
+        setIsAuthenticated(false);
+        setUser(null);
+        setUserRole(null);
+      }
+      setIsLoadingAuth(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const signUp = async (email: string, password: string, role: string, phoneNumber: string) => {
     try {
@@ -286,6 +351,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated, 
       userRole, 
       user,
+      isLoadingAuth,
       signUp,
       login, 
       logout,
