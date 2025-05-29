@@ -24,11 +24,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Set up auth state change listener
+    console.log('Setting up auth state listener');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id);
       try {
         if (session?.user) {
-          // Get user profile from database
+          console.log('Session exists, fetching user profile');
           const { data: profile, error: profileError } = await supabase
             .from('users')
             .select('role')
@@ -39,10 +40,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             throw profileError;
           }
 
+          console.log('User profile loaded:', profile);
           setIsAuthenticated(true);
           setUser(session.user);
           setUserRole(profile?.role || null);
         } else {
+          console.log('No session, clearing auth state');
           setIsAuthenticated(false);
           setUser(null);
           setUserRole(null);
@@ -58,16 +61,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Initial session check
+    console.log('Performing initial session check');
     supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('Initial session result:', session?.user?.id, error);
       if (!error && session) {
-        // Session exists, let onAuthStateChange handle it
-        return;
+        return; // Session exists, let onAuthStateChange handle it
       }
-      // No session, we can stop loading
       setIsLoadingAuth(false);
     });
 
     return () => {
+      console.log('Cleaning up auth state listener');
       subscription.unsubscribe();
     };
   }, []);
@@ -162,7 +166,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (email: string, password: string, role: string, rememberMe: boolean): Promise<{ role: string | null }> => {
+    console.log('Login attempt started:', { email, role, rememberMe });
     try {
+      console.log('Calling Supabase auth.signInWithPassword');
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -171,27 +177,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Authentication failed');
+      if (authError) {
+        console.error('Supabase auth error:', authError);
+        throw authError;
+      }
+      
+      if (!authData.user) {
+        console.error('No user data returned from auth');
+        throw new Error('Authentication failed');
+      }
 
-      // Get user profile from database
+      console.log('Auth successful, fetching user profile');
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('role')
         .eq('id', authData.user.id)
         .single();
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        throw profileError;
+      }
 
-      // Verify role matches
+      console.log('User profile loaded:', profile);
       if (profile.role !== role) {
+        console.error('Role mismatch:', { expected: role, actual: profile.role });
         throw new Error(`Please select ${profile.role} when logging in.`);
       }
 
+      console.log('Login successful, returning role');
       toast.success('Successfully logged in');
       return { role: profile.role };
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('Login process error:', error);
       throw error;
     }
   };
