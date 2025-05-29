@@ -10,14 +10,35 @@ export const api = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
+      // First try to get existing wallet
+      const { data: wallet, error: walletError } = await supabase
         .from('credit_wallets')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
-      if (error) throw error;
-      return data as CreditWallet;
+      if (walletError && walletError.code !== 'PGRST116') {
+        throw walletError;
+      }
+
+      // If no wallet exists, create one with default values
+      if (!wallet) {
+        const { data: newWallet, error: createError } = await supabase
+          .from('credit_wallets')
+          .insert([{
+            user_id: user.id,
+            credits: 0,
+            tier: 'basic',
+            rollover_credits: 0
+          }])
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        return newWallet as CreditWallet;
+      }
+
+      return wallet as CreditWallet;
     }
   },
 
@@ -91,7 +112,6 @@ export const api = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Use the delete_deal RPC function with corrected parameter names
       const { error } = await supabase.rpc('delete_deal', {
         p_deal_id: id,
         p_user_id: user.id
