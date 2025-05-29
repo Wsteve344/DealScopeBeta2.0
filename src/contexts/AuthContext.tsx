@@ -23,6 +23,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, role: string, phoneNumber: string) => {
     try {
+      // First check if the user already exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('email')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (existingUser) {
+        throw new Error('This email is already registered. Please log in or use a different email.');
+      }
+
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -33,7 +44,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        // Handle specific Supabase error codes
+        if (signUpError.message === 'User already registered' || 
+            signUpError.message.includes('user_already_exists')) {
+          throw new Error('This email is already registered. Please log in or use a different email.');
+        }
+        throw signUpError;
+      }
+
       if (!authData.user) throw new Error('Failed to create user account');
 
       // Create user profile in the database

@@ -35,8 +35,22 @@ const SignUp: React.FC = () => {
       toast.success('Account created successfully!');
     } catch (error: any) {
       console.error('Signup error:', error);
-      setError(error.message || 'Failed to create account');
-      toast.error(error.message || 'Failed to create account');
+      
+      // Display user-friendly error message
+      if (error.message.includes('already registered') || error.message.includes('already exists')) {
+        setError('This email is already registered. Please log in or use a different email.');
+        // Optionally, you can add a direct link to the login page
+        toast.error('Account already exists', {
+          duration: 5000,
+          action: {
+            label: 'Log In',
+            onClick: () => navigate('/login')
+          }
+        });
+      } else {
+        setError(error.message || 'Failed to create account');
+        toast.error(error.message || 'Failed to create account');
+      }
     } finally {
       setIsLoading(false);
     }
