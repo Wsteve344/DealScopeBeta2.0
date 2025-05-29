@@ -39,13 +39,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
         options: {
           data: {
-            role: role
+            role: role,
+            phone_number: phoneNumber
           }
         }
       });
 
       if (signUpError) {
-        // Handle specific Supabase error codes
         if (signUpError.message === 'User already registered' || 
             signUpError.message.includes('user_already_exists')) {
           throw new Error('This email is already registered. Please log in or use a different email.');
@@ -62,7 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: authData.user.id,
           email: authData.user.email,
           role: role,
-          phone_number: phoneNumber
+          phone_number: phoneNumber,
+          created_at: new Date().toISOString()
         }]);
 
       if (profileError) throw profileError;
@@ -86,10 +87,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user_id: authData.user.id,
           amount: 3,
           type: 'purchase',
-          status: 'completed'
+          status: 'completed',
+          created_at: new Date().toISOString()
         }]);
 
       if (transactionError) throw transactionError;
+
+      // Create analytics session
+      const { error: analyticsError } = await supabase
+        .from('analytics_events')
+        .insert([{
+          user_id: authData.user.id,
+          event_type: 'auth',
+          event_name: 'signup',
+          metadata: {
+            role: role,
+            signup_method: 'email'
+          }
+        }]);
+
+      if (analyticsError) {
+        console.error('Failed to log analytics event:', analyticsError);
+      }
 
       // Now log the user in
       await login(email, password, role, false);
@@ -135,7 +154,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .insert([{
             id: authData.user.id,
             email: authData.user.email,
-            role: userRole
+            role: userRole,
+            created_at: new Date().toISOString()
           }]);
 
         if (insertError) {
@@ -163,11 +183,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             user_id: authData.user.id,
             amount: 3,
             type: 'purchase',
-            status: 'completed'
+            status: 'completed',
+            created_at: new Date().toISOString()
           }]);
 
         if (transactionError) {
           console.error('Failed to record credit transaction:', transactionError);
+        }
+
+        // Log login event
+        const { error: analyticsError } = await supabase
+          .from('analytics_events')
+          .insert([{
+            user_id: authData.user.id,
+            event_type: 'auth',
+            event_name: 'login',
+            metadata: {
+              role: userRole,
+              login_method: 'email'
+            }
+          }]);
+
+        if (analyticsError) {
+          console.error('Failed to log analytics event:', analyticsError);
         }
 
         // Fetch the newly created profile
