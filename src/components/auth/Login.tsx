@@ -17,7 +17,6 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Handle navigation after successful authentication
   useEffect(() => {
     if (isAuthenticated && !isLoadingAuth && userRole) {
       const from = location.state?.from?.pathname;
@@ -28,16 +27,13 @@ const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login submission started');
     setIsLoading(true);
     setError(null);
 
     try {
-      console.log('Attempting login with role:', formData.role);
       await login(formData.email, formData.password, formData.role, formData.rememberMe);
       // Navigation will be handled by the useEffect hook
     } catch (error: any) {
-      console.error('Login error:', error);
       let errorMessage = 'An unexpected error occurred. Please try again.';
       
       if (error.message?.includes('Invalid login credentials')) {
@@ -50,7 +46,6 @@ const Login: React.FC = () => {
       
       setError(errorMessage);
     } finally {
-      console.log('Login submission completed');
       setIsLoading(false);
     }
   };
