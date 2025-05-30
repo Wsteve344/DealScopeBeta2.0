@@ -1,6 +1,7 @@
 [build]
-  command = "npm run build"
+  command = "yarn build"
   publish = "dist"
+  node_bundler = "esbuild"
 
 [build.environment]
   NODE_VERSION = "20"
