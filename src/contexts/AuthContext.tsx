@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           console.log('👤 User found in session:', session.user.email);
           
+          // Fetch user role from the database
           const { data: profile, error: profileError } = await supabase
             .from('users')
             .select('role')
@@ -74,12 +75,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Initial session check
     console.log('🔍 Checking initial session');
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       console.log('Initial session check result:', !!session);
-      if (!session) {
-        console.log('No initial session found, setting isLoadingAuth to false');
-        setIsLoadingAuth(false);
+      if (session?.user) {
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profileError && profileError.code !== 'PGRST116') {
+            throw profileError;
+          }
+
+          setIsAuthenticated(true);
+          setUser(session.user);
+          setUserRole(profile?.role || null);
+        } catch (error) {
+          console.error('Error fetching initial user profile:', error);
+          setIsAuthenticated(false);
+          setUser(null);
+          setUserRole(null);
+        }
       }
+      setIsLoadingAuth(false);
     });
 
     return () => {
@@ -210,7 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (profile.role !== role) {
         console.error('❌ Role mismatch:', { expected: role, actual: profile.role });
-        throw new Error(`Please select ${profile.role} when logging in.`);
+        throw new Error(`Please select "${profile.role}" when logging in.`);
       }
 
       console.log('✅ Login successful:', { role: profile.role });
