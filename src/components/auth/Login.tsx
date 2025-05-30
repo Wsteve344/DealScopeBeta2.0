@@ -16,6 +16,7 @@ const Login: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestedRole, setSuggestedRole] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated && !isLoadingAuth && userRole) {
@@ -29,6 +30,7 @@ const Login: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuggestedRole(null);
 
     try {
       await login(formData.email, formData.password, formData.role, formData.rememberMe);
@@ -36,7 +38,14 @@ const Login: React.FC = () => {
     } catch (error: any) {
       let errorMessage = 'An unexpected error occurred. Please try again.';
       
-      if (error.message?.includes('Invalid login credentials')) {
+      if (error.message?.includes('Role mismatch')) {
+        const match = error.message.match(/{"expected":"(\w+)","actual":"(\w+)"}/);
+        if (match) {
+          const [, expected] = match;
+          setSuggestedRole(expected);
+          errorMessage = `Please select "${expected === 'analyst' ? 'Deal Analyst' : 'Property Investor'}" in the role selector above.`;
+        }
+      } else if (error.message?.includes('Invalid login credentials')) {
         errorMessage = 'Invalid email or password. Please check your credentials and try again.';
       } else if (error.message?.includes('Failed to fetch user profile')) {
         errorMessage = 'Unable to verify user credentials. Please try again.';
@@ -48,6 +57,16 @@ const Login: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRoleToggle = () => {
+    setFormData(prev => ({
+      ...prev,
+      role: prev.role === 'investor' ? 'analyst' : 'investor'
+    }));
+    // Clear error and suggestion when role is changed
+    setError(null);
+    setSuggestedRole(null);
   };
 
   if (isLoadingAuth) {
@@ -79,8 +98,18 @@ const Login: React.FC = () => {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           {error && (
-            <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg">
+            <div className={`mb-4 p-4 text-sm rounded-lg ${suggestedRole ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-red-100 text-red-700'}`}>
               {error}
+              {suggestedRole && (
+                <div className="mt-2">
+                  <button
+                    onClick={handleRoleToggle}
+                    className="text-blue-700 font-medium hover:text-blue-800 underline"
+                  >
+                    Switch role now
+                  </button>
+                </div>
+              )}
             </div>
           )}
           
@@ -89,7 +118,7 @@ const Login: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 I am a
               </label>
-              <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+              <div className={`flex items-center justify-between p-2 rounded-lg ${suggestedRole ? 'bg-blue-50 ring-2 ring-blue-500' : 'bg-gray-50'}`}>
                 <span className={`px-3 py-1 rounded-md transition-colors ${
                   formData.role === 'investor' ? 'text-blue-600 font-medium' : 'text-gray-500'
                 }`}>
@@ -97,10 +126,7 @@ const Login: React.FC = () => {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setFormData(prev => ({
-                    ...prev,
-                    role: prev.role === 'investor' ? 'analyst' : 'investor'
-                  }))}
+                  onClick={handleRoleToggle}
                   className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   style={{ backgroundColor: formData.role === 'analyst' ? '#2563EB' : '#E5E7EB' }}
                 >
